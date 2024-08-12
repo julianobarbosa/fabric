@@ -1,6 +1,7 @@
+from sys import api_version
 from dotenv import load_dotenv
 from pydub import AudioSegment
-from openai import OpenAI
+from openai import AzureOpenAI
 import os
 import argparse
 
@@ -10,9 +11,16 @@ class Whisper:
         env_file = os.path.expanduser("~/.config/fabric/.env")
         load_dotenv(env_file)
         try:
-            apikey = os.environ["OPENAI_API_KEY"]
-            self.client = OpenAI()
-            self.client.api_key = apikey
+            endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+            api_key = os.environ.get("AZURE_OPENAI_API_KEY")
+            deployment = os.environ.get("AZURE_OPENAI_MODEL")
+            api_version = os.environ.get("AZURE_OPENAI_API_VERSION")
+
+            self.client = AzureOpenAI(
+                base_url=endpoint,
+                api_key=api_key,
+                api_version=api_version,
+            )
         except KeyError:
             print("OPENAI_API_KEY not found in environment variables.")
 
@@ -42,7 +50,7 @@ class Whisper:
         return segments
 
     def process_segment(self, segment):
-        """        Transcribe an audio file and print the transcript.
+        """Transcribe an audio file and print the transcript.
 
         Args:
             audio_file (str): The path to the audio file to be transcribed.
@@ -69,7 +77,7 @@ class Whisper:
             print(f"Error: {e}")
 
     def process_file(self, audio_file):
-        """        Transcribe an audio file and print the transcript.
+        """Transcribe an audio file and print the transcript.
 
         Args:
             audio_file (str): The path to the audio file to be transcribed.
@@ -91,7 +99,7 @@ class Whisper:
                 segment_file_path = f"segment_{i}.mp3"
                 segment.export(segment_file_path, format="mp3")
                 self.process_segment(segment_file_path)
-            print(' '.join(self.whole_response))
+            print(" ".join(self.whole_response))
 
         except Exception as e:
             print(f"Error: {e}")
@@ -100,7 +108,8 @@ class Whisper:
 def main():
     parser = argparse.ArgumentParser(description="Transcribe an audio file.")
     parser.add_argument(
-        "audio_file", help="The path to the audio file to be transcribed.")
+        "audio_file", help="The path to the audio file to be transcribed."
+    )
     args = parser.parse_args()
     whisper = Whisper()
     whisper.process_file(args.audio_file)
