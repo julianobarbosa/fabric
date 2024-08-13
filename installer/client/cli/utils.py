@@ -1,6 +1,6 @@
 import requests
 import os
-from openai import OpenAI, APIConnectionError
+from openai import AzureOpenAI, APIConnectionError
 import asyncio
 import pyperclip
 import sys
@@ -42,7 +42,11 @@ class Standalone:
         load_dotenv(env_file)
         if "OPENAI_API_KEY" in os.environ:
             api_key = os.environ["OPENAI_API_KEY"]
-            self.client = OpenAI(api_key=api_key)
+            self.client = AzureOpenAI(api_key=api_key)
+            self.client.azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+            self.client.api_version = os.environ.get("AZURE_OPENAI_API_VERSION")
+            self.client.azure_deployment = os.environ.get("OPENAI_MODEL_NAME")
+
         self.local = False
         self.config_pattern_directory = config_directory
         self.pattern = pattern
