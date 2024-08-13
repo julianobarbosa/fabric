@@ -1,7 +1,6 @@
-from sys import api_version
 from dotenv import load_dotenv
 from pydub import AudioSegment
-from openai import AzureOpenAI
+from openai import OpenAI
 import os
 import argparse
 
@@ -11,16 +10,9 @@ class Whisper:
         env_file = os.path.expanduser("~/.config/fabric/.env")
         load_dotenv(env_file)
         try:
-            endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
-            api_key = os.environ.get("AZURE_OPENAI_API_KEY")
-            deployment = os.environ.get("AZURE_OPENAI_MODEL")
-            api_version = os.environ.get("AZURE_OPENAI_API_VERSION")
-
-            self.client = AzureOpenAI(
-                base_url=endpoint,
-                api_key=api_key,
-                api_version=api_version,
-            )
+            apikey = os.environ["OPENAI_API_KEY"]
+            self.client = OpenAI()
+            self.client.api_key = apikey
         except KeyError:
             print("OPENAI_API_KEY not found in environment variables.")
 
@@ -68,8 +60,7 @@ class Whisper:
             #         audio_file = f.name
             audio_file = open(segment, "rb")
             response = self.client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file
+                model="whisper-1", file=audio_file
             )
             self.whole_response.append(response.text)
 
