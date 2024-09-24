@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	goopenai "github.com/sashabaranov/go-openai"
 
 	"github.com/danielmiessler/fabric/common"
 	"github.com/liushuangls/go-anthropic/v2"
 )
+
+const baseUrl = "https://api.anthropic.com/v1"
 
 func NewClient() (ret *Client) {
 	vendorName := "Anthropic"
@@ -19,15 +22,17 @@ func NewClient() (ret *Client) {
 		ConfigureCustom: ret.configure,
 	}
 
+	ret.ApiBaseURL = ret.AddSetupQuestion("API Base URL", false)
+	ret.ApiBaseURL.Value = baseUrl
 	ret.ApiKey = ret.Configurable.AddSetupQuestion("API key", true)
 
 	// we could provide a setup question for the following settings
 	ret.maxTokens = 4096
 	ret.defaultRequiredUserMessage = "Hi"
 	ret.models = []string{
-		anthropic.ModelClaude3Haiku20240307, anthropic.ModelClaude3Opus20240229,
-		anthropic.ModelClaude3Opus20240229, anthropic.ModelClaude2Dot0, anthropic.ModelClaude2Dot1,
-		anthropic.ModelClaudeInstant1Dot2, "claude-3-5-sonnet-20240620",
+		string(anthropic.ModelClaude3Haiku20240307), string(anthropic.ModelClaude3Opus20240229),
+		string(anthropic.ModelClaude3Opus20240229), string(anthropic.ModelClaude2Dot0), string(anthropic.ModelClaude2Dot1),
+		string(anthropic.ModelClaudeInstant1Dot2), "claude-3-5-sonnet-20240620",
 	}
 
 	return
@@ -35,7 +40,8 @@ func NewClient() (ret *Client) {
 
 type Client struct {
 	*common.Configurable
-	ApiKey *common.SetupQuestion
+	ApiBaseURL *common.SetupQuestion
+	ApiKey     *common.SetupQuestion
 
 	maxTokens                  int
 	defaultRequiredUserMessage string
@@ -45,7 +51,11 @@ type Client struct {
 }
 
 func (an *Client) configure() (err error) {
-	an.client = anthropic.NewClient(an.ApiKey.Value)
+	if an.ApiBaseURL.Value != "" {
+		an.client = anthropic.NewClient(an.ApiKey.Value, anthropic.WithBaseURL(an.ApiBaseURL.Value))
+	} else {
+		an.client = anthropic.NewClient(an.ApiKey.Value)
+	}
 	return
 }
 
@@ -104,7 +114,7 @@ func (an *Client) buildMessagesRequest(msgs []*common.Message, opts *common.Chat
 	messages := an.toMessages(msgs)
 
 	ret = anthropic.MessagesRequest{
-		Model:       opts.Model,
+		Model:       anthropic.Model(opts.Model),
 		Temperature: &temperature,
 		TopP:        &topP,
 		Messages:    messages,
@@ -121,10 +131,8 @@ func (an *Client) toMessages(msgs []*common.Message) (ret []anthropic.Message) {
 	for _, msg := range normalizedMessages {
 		var message anthropic.Message
 		switch msg.Role {
-		case "user":
+		case goopenai.ChatMessageRoleUser:
 			message = anthropic.NewUserTextMessage(msg.Content)
-		case "system":
-			message = anthropic.NewAssistantTextMessage(msg.Content)
 		default:
 			message = anthropic.NewAssistantTextMessage(msg.Content)
 		}

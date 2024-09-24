@@ -9,6 +9,7 @@ import (
 
 	"github.com/danielmiessler/fabric/common"
 	"github.com/jessevdk/go-flags"
+	"golang.org/x/text/language"
 )
 
 // Flags create flags struct. the users flags go into this, this will be passed to the chat struct in cli
@@ -23,6 +24,7 @@ type Flags struct {
 	TopP                    float64           `short:"T" long:"topp" description:"Set top P" default:"0.9"`
 	Stream                  bool              `short:"s" long:"stream" description:"Stream"`
 	PresencePenalty         float64           `short:"P" long:"presencepenalty" description:"Set presence penalty" default:"0.0"`
+	Raw                     bool              `short:"r" long:"raw" description:"Use the defaults of the model without sending chat options (like temperature etc.) and use the user role instead of the system role for patterns."`
 	FrequencyPenalty        float64           `short:"F" long:"frequencypenalty" description:"Set frequency penalty" default:"0.0"`
 	ListPatterns            bool              `short:"l" long:"listpatterns" description:"List all patterns"`
 	ListAllModels           bool              `short:"L" long:"listmodels" description:"List all available models"`
@@ -34,11 +36,14 @@ type Flags struct {
 	Model                   string            `short:"m" long:"model" description:"Choose model"`
 	Output                  string            `short:"o" long:"output" description:"Output to file" default:""`
 	LatestPatterns          string            `short:"n" long:"latest" description:"Number of latest patterns to list" default:"0"`
-	ChangeDefaultModel      bool              `short:"d" long:"changeDefaultModel" description:"Change default pattern"`
+	ChangeDefaultModel      bool              `short:"d" long:"changeDefaultModel" description:"Change default model"`
 	YouTube                 string            `short:"y" long:"youtube" description:"YouTube video url to grab transcript, comments from it and send to chat"`
 	YouTubeTranscript       bool              `long:"transcript" description:"Grab transcript from YouTube video and send to chat"`
 	YouTubeComments         bool              `long:"comments" description:"Grab comments from YouTube video and send to chat"`
 	DryRun                  bool              `long:"dry-run" description:"Show what would be sent to the model without actually sending it"`
+	Language                string            `short:"g" long:"language" description:"Specify the Language Code for the chat, e.g. -g=en -g=zh" default:""`
+	ScrapeURL               string            `short:"u" long:"scrape_url" description:"Scrape website URL to markdown using Jina AI"`
+	ScrapeQuestion          string            `short:"q" long:"scrape_question" description:"Search question using Jina AI"`
 }
 
 // Init Initialize flags. returns a Flags struct and an error
@@ -93,6 +98,7 @@ func (o *Flags) BuildChatOptions() (ret *common.ChatOptions) {
 		TopP:             o.TopP,
 		PresencePenalty:  o.PresencePenalty,
 		FrequencyPenalty: o.FrequencyPenalty,
+		Raw:              o.Raw,
 	}
 	return
 }
@@ -104,6 +110,21 @@ func (o *Flags) BuildChatRequest() (ret *common.ChatRequest) {
 		PatternName:      o.Pattern,
 		PatternVariables: o.PatternVariables,
 		Message:          o.Message,
+	}
+	if o.Language != "" {
+		langTag, err := language.Parse(o.Language)
+		if err == nil {
+			ret.Language = langTag.String()
+		}
+	}
+	return
+}
+
+func (o *Flags) AppendMessage(message string) {
+	if o.Message != "" {
+		o.Message = o.Message + "\n" + message
+	} else {
+		o.Message = message
 	}
 	return
 }
