@@ -3,10 +3,14 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"strconv"
+
 	"github.com/atotto/clipboard"
 	"github.com/danielmiessler/fabric/common"
 	"github.com/danielmiessler/fabric/db"
 	"github.com/danielmiessler/fabric/jina"
+	"github.com/danielmiessler/fabric/lang"
 	"github.com/danielmiessler/fabric/vendors/anthropic"
 	"github.com/danielmiessler/fabric/vendors/azure"
 	"github.com/danielmiessler/fabric/vendors/dryrun"
@@ -19,8 +23,6 @@ import (
 	"github.com/danielmiessler/fabric/vendors/siliconcloud"
 	"github.com/danielmiessler/fabric/youtube"
 	"github.com/pkg/errors"
-	"os"
-	"strconv"
 )
 
 const DefaultPatternsGitRepoUrl = "https://github.com/danielmiessler/fabric.git"
@@ -49,6 +51,7 @@ func NewFabricBase(db *db.Db) (ret *Fabric) {
 		VendorsAll:     NewVendorsManager(),
 		PatternsLoader: NewPatternsLoader(db.Patterns),
 		YouTube:        youtube.NewYouTube(),
+		Language:       lang.NewLanguage(),
 		Jina:           jina.NewClient(),
 	}
 
@@ -64,7 +67,7 @@ func NewFabricBase(db *db.Db) (ret *Fabric) {
 		"Enter the index the name of your default model")
 
 	ret.VendorsAll.AddVendors(openai.NewClient(), azure.NewClient(), ollama.NewClient(), groq.NewClient(),
-		gemini.NewClient(), anthropic.NewClient(), siliconcloud.NewClient(), openrouter.NewClient(), mistral.NewClient(), dryrun.NewClient())
+		gemini.NewClient(), anthropic.NewClient(), siliconcloud.NewClient(), openrouter.NewClient(), mistral.NewClient())
 
 	return
 }
@@ -75,6 +78,7 @@ type Fabric struct {
 	VendorsAll *VendorsManager
 	*PatternsLoader
 	*youtube.YouTube
+	*lang.Language
 	Jina *jina.Client
 
 	Db *db.Db
@@ -101,6 +105,7 @@ func (o *Fabric) SaveEnvFile() (err error) {
 
 	o.YouTube.SetupFillEnvFileContent(&envFileContent)
 	o.Jina.SetupFillEnvFileContent(&envFileContent)
+	o.Language.SetupFillEnvFileContent(&envFileContent)
 
 	err = o.Db.SaveEnv(envFileContent.String())
 	return
@@ -122,6 +127,10 @@ func (o *Fabric) Setup() (err error) {
 	}
 
 	if err = o.PatternsLoader.Setup(); err != nil {
+		return
+	}
+
+	if err = o.Language.SetupOrSkip(); err != nil {
 		return
 	}
 
@@ -179,7 +188,7 @@ func (o *Fabric) SetupVendors() (err error) {
 }
 
 func (o *Fabric) SetupVendor(vendorName string) (err error) {
-	if err = o.VendorsAll.SetupVendor(vendorName); err != nil {
+	if err = o.VendorsAll.SetupVendor(vendorName, o.Vendors); err != nil {
 		return
 	}
 	err = o.SaveEnvFile()
@@ -200,6 +209,7 @@ func (o *Fabric) configure() (err error) {
 	//YouTube and Jina are not mandatory, so ignore not configured error
 	_ = o.YouTube.Configure()
 	_ = o.Jina.Configure()
+	_ = o.Language.Configure()
 
 	return
 }
