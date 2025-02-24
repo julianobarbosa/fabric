@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -286,7 +287,7 @@ func Cli(version string) (err error) {
 func processYoutubeVideo(
 	flags *Flags, registry *core.PluginRegistry, videoId string) (message string, err error) {
 
-	if !flags.YouTubeComments || flags.YouTubeTranscript {
+	if (!flags.YouTubeComments && !flags.YouTubeMetadata) || flags.YouTubeTranscript || flags.YouTubeTranscriptWithTimestamps {
 		var transcript string
 		var language = "en"
 		if flags.Language != "" || registry.Language.DefaultLanguage.Value != "" {
@@ -296,8 +297,14 @@ func processYoutubeVideo(
 				language = registry.Language.DefaultLanguage.Value
 			}
 		}
-		if transcript, err = registry.YouTube.GrabTranscript(videoId, language); err != nil {
-			return
+		if flags.YouTubeTranscriptWithTimestamps {
+			if transcript, err = registry.YouTube.GrabTranscriptWithTimestamps(videoId, language); err != nil {
+				return
+			}
+		} else {
+			if transcript, err = registry.YouTube.GrabTranscript(videoId, language); err != nil {
+				return
+			}
 		}
 		message = AppendMessage(message, transcript)
 	}
@@ -312,6 +319,16 @@ func processYoutubeVideo(
 
 		message = AppendMessage(message, commentsString)
 	}
+
+	if flags.YouTubeMetadata {
+		var metadata *youtube.VideoMetadata
+		if metadata, err = registry.YouTube.GrabMetadata(videoId); err != nil {
+			return
+		}
+		metadataJson, _ := json.MarshalIndent(metadata, "", "  ")
+		message = AppendMessage(message, string(metadataJson))
+	}
+
 	return
 }
 
